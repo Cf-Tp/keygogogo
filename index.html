@@ -1,0 +1,2001 @@
+
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>KEYWARDEN — Painel de Licenças</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ===================================================================
+   KEYWARDEN — Design tokens
+   Subject: a license-key vault / security clearance terminal.
+   Palette: void black surfaces, single neon-pink signal color,
+   crimson reserved strictly for danger states (expired / banned).
+   Signature: HUD corner-bracket framing on every panel + "keycard"
+   components for issued licenses + a slow ember-drift canvas behind
+   the whole app, like dust settling inside a server vault.
+=================================================================== */
+:root{
+  --bg-void:#06050a;
+  --bg-void-2:#08070e;
+  --bg-panel:#0e0c15;
+  --bg-panel-2:#13111c;
+  --bg-elevated:#181522;
+  --bg-input:#0b0a12;
+
+  --border-soft: rgba(255,255,255,0.07);
+  --border-soft-2: rgba(255,255,255,0.12);
+  --border-pink: rgba(255,43,214,0.4);
+
+  --pink: #ff2bd6;
+  --pink-strong:#ff14cf;
+  --pink-soft:#ff8de9;
+  --pink-deep:#7a0d6c;
+  --pink-glow: rgba(255,43,214,0.45);
+  --pink-glow-soft: rgba(255,43,214,0.18);
+
+  --crimson:#ff3b5c;
+  --crimson-soft:#ff7a90;
+  --crimson-glow: rgba(255,59,92,0.4);
+  --crimson-bg: rgba(255,59,92,0.08);
+
+  --amber:#ffb02b;
+  --amber-glow: rgba(255,176,43,0.35);
+
+  --slate:#716c80;
+  --slate-soft:#4a4656;
+
+  --text-primary:#f3effa;
+  --text-secondary:#aaa3bd;
+  --text-muted:#6f6a82;
+
+  --font-display:'Orbitron', sans-serif;
+  --font-body:'Rajdhani', sans-serif;
+  --font-mono:'JetBrains Mono', monospace;
+
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --ease: cubic-bezier(.4,0,.2,1);
+  --t-fast: 140ms var(--ease);
+  --t-med: 240ms var(--ease);
+}
+
+*{box-sizing:border-box; margin:0; padding:0;}
+html,body{height:100%;}
+body{
+  background:var(--bg-void);
+  color:var(--text-primary);
+  font-family:var(--font-body);
+  font-size:15px;
+  line-height:1.5;
+  overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+::selection{background:var(--pink-glow-soft); color:#fff;}
+
+::-webkit-scrollbar{width:10px; height:10px;}
+::-webkit-scrollbar-track{background:var(--bg-void);}
+::-webkit-scrollbar-thumb{background:var(--pink-deep); border-radius:6px;}
+::-webkit-scrollbar-thumb:hover{background:var(--pink-deep);}
+
+a, button, input, select, textarea{font-family:inherit; color:inherit;}
+button{cursor:pointer;}
+
+:focus-visible{
+  outline:2px solid var(--pink);
+  outline-offset:2px;
+  border-radius:2px;
+}
+
+#bg-canvas{
+  position:fixed; inset:0; width:100%; height:100%;
+  z-index:0; pointer-events:none; opacity:.55;
+}
+
+.eyebrow{
+  font-family:var(--font-mono);
+  font-size:11px;
+  letter-spacing:.18em;
+  text-transform:uppercase;
+  color:var(--pink-soft);
+  display:flex; align-items:center; gap:8px;
+}
+.eyebrow::before{
+  content:'';
+  width:6px; height:6px;
+  background:var(--pink);
+  box-shadow:0 0 8px var(--pink-glow);
+  display:inline-block;
+}
+
+.mono{font-family:var(--font-mono);}
+
+/* ===================== Loading overlay ===================== */
+#loading-overlay{
+  position:fixed; inset:0; z-index:999;
+  background:var(--bg-void);
+  display:flex; align-items:center; justify-content:center; flex-direction:column;
+  gap:18px;
+  transition:opacity var(--t-med);
+}
+.loader-ring{
+  width:54px; height:54px; border-radius:50%;
+  border:2px solid var(--border-soft);
+  border-top-color:var(--pink);
+  border-right-color:var(--pink-deep);
+  animation:spin 900ms linear infinite;
+  box-shadow:0 0 24px var(--pink-glow-soft);
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+#loading-overlay p{
+  font-family:var(--font-mono);
+  font-size:12px;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+  color:var(--text-secondary);
+}
+
+/* ===================== App shell ===================== */
+.app{
+  position:relative; z-index:1;
+  display:grid;
+  grid-template-columns:248px 1fr;
+  min-height:100vh;
+}
+@media (max-width:880px){
+  .app{grid-template-columns:76px 1fr;}
+}
+
+/* ===================== Sidebar ===================== */
+.sidebar{
+  background:linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-void-2) 100%);
+  border-right:1px solid var(--border-soft);
+  display:flex; flex-direction:column;
+  padding:22px 16px;
+  position:sticky; top:0; height:100vh;
+}
+.brand{
+  display:flex; align-items:center; gap:10px;
+  padding:6px 8px 26px 8px;
+  border-bottom:1px solid var(--border-soft);
+  margin-bottom:18px;
+}
+.brand-mark{
+  width:34px; height:34px; flex:0 0 auto;
+  position:relative;
+  display:flex; align-items:center; justify-content:center;
+  border:1px solid var(--border-pink);
+  background:var(--bg-elevated);
+}
+.brand-mark::before, .brand-mark::after{
+  content:''; position:absolute; width:8px; height:8px; pointer-events:none;
+}
+.brand-mark::before{top:-1px;left:-1px;border-top:2px solid var(--pink);border-left:2px solid var(--pink);}
+.brand-mark::after{bottom:-1px;right:-1px;border-bottom:2px solid var(--pink);border-right:2px solid var(--pink);}
+.brand-mark svg{width:18px; height:18px; color:var(--pink); filter:drop-shadow(0 0 6px var(--pink-glow));}
+.brand-text{display:flex; flex-direction:column; line-height:1.1;}
+.brand-text strong{
+  font-family:var(--font-display);
+  font-size:15px; letter-spacing:.06em;
+  color:var(--text-primary);
+}
+.brand-text strong span{color:var(--pink); text-shadow:0 0 14px var(--pink-glow);}
+.brand-text small{font-family:var(--font-mono); font-size:10px; color:var(--text-muted); letter-spacing:.12em;}
+@media (max-width:880px){ .brand-text{display:none;} .brand{justify-content:center;} }
+
+.nav{display:flex; flex-direction:column; gap:4px; flex:1;}
+.nav-item{
+  display:flex; align-items:center; gap:12px;
+  padding:11px 12px;
+  background:transparent; border:1px solid transparent;
+  color:var(--text-secondary);
+  font-family:var(--font-body); font-weight:600; font-size:14px;
+  letter-spacing:.02em;
+  text-align:left;
+  transition:background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+  position:relative;
+}
+.nav-item svg{width:18px; height:18px; flex:0 0 auto; opacity:.85;}
+.nav-item:hover{background:var(--bg-elevated); color:var(--text-primary);}
+.nav-item.active{
+  color:var(--pink-soft);
+  border-color:var(--border-pink);
+  background:linear-gradient(90deg, var(--pink-glow-soft), transparent);
+}
+.nav-item.active::before{
+  content:''; position:absolute; left:-16px; top:8px; bottom:8px; width:3px;
+  background:var(--pink); box-shadow:0 0 10px var(--pink-glow);
+}
+@media (max-width:880px){
+  .nav-item{justify-content:center; padding:13px 0;}
+  .nav-item span.label{display:none;}
+  .nav-item.active::before{left:0;}
+}
+
+.sidebar-foot{
+  border-top:1px solid var(--border-soft);
+  padding-top:14px; margin-top:14px;
+  font-family:var(--font-mono); font-size:10.5px; color:var(--text-muted);
+  letter-spacing:.05em;
+  display:flex; flex-direction:column; gap:6px;
+}
+.sidebar-foot .dot-line{display:flex; align-items:center; gap:7px;}
+.sidebar-foot .dot{width:6px;height:6px; background:var(--pink); box-shadow:0 0 6px var(--pink-glow); flex:0 0 auto;}
+@media (max-width:880px){ .sidebar-foot{display:none;} }
+
+/* ===================== Main / Topbar ===================== */
+.main{display:flex; flex-direction:column; min-height:100vh;}
+.topbar{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:22px 36px 18px 36px;
+  border-bottom:1px solid var(--border-soft);
+  flex-wrap:wrap; gap:14px;
+}
+.topbar h1{
+  font-family:var(--font-display);
+  font-size:21px; letter-spacing:.02em; font-weight:700;
+  margin-top:4px;
+}
+.topbar-actions{display:flex; gap:10px; align-items:center;}
+.clock{
+  font-family:var(--font-mono); font-size:12px; color:var(--text-secondary);
+  border:1px solid var(--border-soft); padding:8px 12px;
+  display:flex; align-items:center; gap:8px;
+}
+.clock .dot{width:6px;height:6px; border-radius:50%; background:#37e07a; box-shadow:0 0 6px rgba(55,224,122,.6); animation:blink 2.4s ease-in-out infinite;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:.25;}}
+
+.page{padding:8px 36px 48px 36px; animation:fadein var(--t-med);}
+@keyframes fadein{from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:none;}}
+.page[hidden]{display:none;}
+
+@media (max-width:600px){
+  .topbar, .page{padding-left:18px; padding-right:18px;}
+}
+
+/* ===================== Panel / Card (signature corner-bracket) ===================== */
+.panel{
+  position:relative;
+  background:var(--bg-panel);
+  border:1px solid var(--border-soft);
+  padding:22px;
+}
+.panel::before, .panel::after{
+  content:''; position:absolute; width:14px; height:14px; pointer-events:none;
+}
+.panel::before{top:-1px; left:-1px; border-top:2px solid var(--pink); border-left:2px solid var(--pink);}
+.panel::after{bottom:-1px; right:-1px; border-bottom:2px solid var(--pink); border-right:2px solid var(--pink);}
+.panel-title{
+  font-family:var(--font-display); font-size:13px; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--text-primary);
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:16px; gap:10px; flex-wrap:wrap;
+}
+.panel-title small{
+  font-family:var(--font-mono); font-size:10.5px; color:var(--text-muted);
+  text-transform:none; letter-spacing:.02em;
+}
+
+.grid{display:grid; gap:18px;}
+.grid-stats{grid-template-columns:repeat(5, 1fr);}
+@media (max-width:1180px){.grid-stats{grid-template-columns:repeat(3,1fr);}}
+@media (max-width:680px){.grid-stats{grid-template-columns:repeat(2,1fr);}}
+
+.stat-card{
+  position:relative; background:var(--bg-panel); border:1px solid var(--border-soft);
+  padding:18px 18px 16px 18px; overflow:hidden;
+}
+.stat-card::before, .stat-card::after{content:''; position:absolute; width:10px; height:10px; pointer-events:none;}
+.stat-card::before{top:-1px; left:-1px; border-top:2px solid var(--stat-color, var(--pink)); border-left:2px solid var(--stat-color, var(--pink));}
+.stat-card::after{bottom:-1px; right:-1px; border-bottom:2px solid var(--stat-color, var(--pink)); border-right:2px solid var(--stat-color, var(--pink));}
+.stat-card .eyebrow{margin-bottom:10px;}
+.stat-card .eyebrow::before{background:var(--stat-color, var(--pink)); box-shadow:0 0 8px var(--stat-color, var(--pink-glow));}
+.stat-card .num{
+  font-family:var(--font-display); font-size:32px; font-weight:800;
+  color:var(--text-primary); line-height:1;
+}
+.stat-card .sub{font-family:var(--font-mono); font-size:11px; color:var(--text-muted); margin-top:6px;}
+
+.row{display:flex; gap:18px; align-items:flex-start;}
+.row.wrap{flex-wrap:wrap;}
+.col{flex:1; min-width:0;}
+@media (max-width:980px){.row.split{flex-direction:column;}}
+
+/* ===================== Buttons ===================== */
+.btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  font-family:var(--font-body); font-weight:700; font-size:13.5px; letter-spacing:.03em;
+  padding:11px 18px;
+  border:1px solid var(--border-soft-2);
+  background:var(--bg-elevated);
+  color:var(--text-primary);
+  transition:all var(--t-fast);
+  white-space:nowrap;
+}
+.btn svg{width:15px; height:15px;}
+.btn:hover{border-color:var(--border-pink); color:var(--pink-soft);}
+.btn:active{transform:translateY(1px);}
+.btn-primary{
+  background:linear-gradient(135deg, var(--pink-strong), var(--pink-deep));
+  border-color:transparent; color:#0a0612;
+  box-shadow:0 0 0 1px var(--border-pink), 0 8px 22px -10px var(--pink-glow);
+}
+.btn-primary:hover{box-shadow:0 0 0 1px var(--pink), 0 10px 26px -8px var(--pink-glow); color:#0a0612; filter:brightness(1.06);}
+.btn-ghost{background:transparent; border-color:var(--border-soft);}
+.btn-danger{border-color:rgba(255,59,92,.4); color:var(--crimson-soft);}
+.btn-danger:hover{border-color:var(--crimson); background:var(--crimson-bg); color:var(--crimson-soft);}
+.btn-sm{padding:7px 12px; font-size:12px;}
+.btn-block{width:100%;}
+.btn[disabled]{opacity:.4; cursor:not-allowed; pointer-events:none;}
+
+.icon-btn{
+  width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center;
+  background:var(--bg-elevated); border:1px solid var(--border-soft);
+  color:var(--text-secondary); transition:all var(--t-fast); position:relative;
+}
+.icon-btn svg{width:15px; height:15px;}
+.icon-btn:hover{color:var(--pink-soft); border-color:var(--border-pink);}
+.icon-btn.danger:hover{color:var(--crimson-soft); border-color:rgba(255,59,92,.5);}
+.icon-btn[data-tip]:hover::after{
+  content:attr(data-tip); position:absolute; bottom:calc(100% + 8px); left:50%; transform:translateX(-50%);
+  background:var(--bg-elevated); border:1px solid var(--border-soft-2); padding:4px 8px;
+  font-family:var(--font-mono); font-size:10px; white-space:nowrap; color:var(--text-primary);
+  z-index:5; pointer-events:none;
+}
+
+/* ===================== Forms ===================== */
+label.field-label{
+  display:block; font-family:var(--font-mono); font-size:11px; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--text-muted); margin-bottom:8px;
+}
+.field{margin-bottom:18px;}
+.input, select.input, textarea.input{
+  width:100%; background:var(--bg-input); border:1px solid var(--border-soft-2);
+  color:var(--text-primary); padding:11px 13px; font-family:var(--font-mono); font-size:13.5px;
+  transition:border-color var(--t-fast), box-shadow var(--t-fast);
+}
+.input::placeholder{color:var(--text-muted);}
+.input:focus{border-color:var(--pink); box-shadow:0 0 0 3px var(--pink-glow-soft); outline:none;}
+select.input{appearance:none; cursor:pointer;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23ff8de9' stroke-width='2'%3E%3Cpath d='M5 7l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 12px center; background-size:14px;
+  padding-right:36px;
+}
+textarea.input{resize:vertical; min-height:64px; font-family:var(--font-body);}
+.help-text{font-size:11.5px; color:var(--text-muted); margin-top:6px;}
+
+.segmented{display:flex; border:1px solid var(--border-soft-2); background:var(--bg-input); overflow:hidden;}
+.segmented button{
+  flex:1; padding:10px 6px; background:transparent; border:none; border-right:1px solid var(--border-soft-2);
+  color:var(--text-secondary); font-family:var(--font-mono); font-size:11.5px; letter-spacing:.04em;
+  transition:all var(--t-fast);
+}
+.segmented button:last-child{border-right:none;}
+.segmented button.active{background:var(--pink-glow-soft); color:var(--pink-soft); box-shadow:inset 0 -2px 0 var(--pink);}
+.segmented button:hover:not(.active){color:var(--text-primary);}
+
+/* ===================== Badges ===================== */
+.badge{
+  display:inline-flex; align-items:center; gap:6px;
+  font-family:var(--font-mono); font-size:10.5px; letter-spacing:.05em; text-transform:uppercase;
+  padding:4px 9px; border:1px solid; white-space:nowrap;
+}
+.badge::before{content:''; width:6px; height:6px; border-radius:50%; flex:0 0 auto;}
+.badge-unused{color:var(--slate); border-color:rgba(255,255,255,.16); background:rgba(255,255,255,.03);}
+.badge-unused::before{background:var(--slate);}
+.badge-active{color:var(--pink-soft); border-color:var(--border-pink); background:var(--pink-glow-soft);}
+.badge-active::before{background:var(--pink); box-shadow:0 0 6px var(--pink-glow);}
+.badge-expired{color:var(--amber); border-color:rgba(255,176,43,.4); background:rgba(255,176,43,.08);}
+.badge-expired::before{background:var(--amber); box-shadow:0 0 6px var(--amber-glow);}
+.badge-banned{color:var(--crimson-soft); border-color:rgba(255,59,92,.45); background:var(--crimson-bg);}
+.badge-banned::before{background:var(--crimson); box-shadow:0 0 6px var(--crimson-glow);}
+
+/* ===================== Table ===================== */
+.table-wrap{overflow-x:auto; border:1px solid var(--border-soft);}
+table.kw-table{width:100%; border-collapse:collapse; min-width:880px;}
+table.kw-table thead th{
+  text-align:left; font-family:var(--font-mono); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--text-muted); padding:12px 14px; border-bottom:1px solid var(--border-soft); background:var(--bg-panel-2);
+  position:sticky; top:0;
+}
+table.kw-table tbody td{
+  padding:13px 14px; border-bottom:1px solid var(--border-soft); font-size:13.5px; vertical-align:middle;
+}
+table.kw-table tbody tr{transition:background var(--t-fast);}
+table.kw-table tbody tr:hover{background:rgba(255,43,214,.035);}
+table.kw-table tbody tr.is-banned{opacity:.75;}
+.cell-actions{display:flex; gap:6px; align-items:center;}
+.key-chip{font-family:var(--font-mono); font-size:12.5px; letter-spacing:.02em; color:var(--text-primary); display:inline-flex; align-items:center; gap:8px;}
+.hwid-chip{font-family:var(--font-mono); font-size:11.5px; color:var(--text-secondary);}
+.hwid-chip.empty{color:var(--text-muted); font-style:italic;}
+.empty-state{
+  padding:54px 24px; text-align:center; color:var(--text-muted);
+}
+.empty-state svg{width:38px; height:38px; color:var(--slate-soft); margin-bottom:12px;}
+.empty-state p{font-family:var(--font-mono); font-size:12.5px; letter-spacing:.04em;}
+
+/* ===================== Keycard (signature element) ===================== */
+.keycard{
+  position:relative; background:linear-gradient(160deg, var(--bg-elevated), var(--bg-panel-2));
+  border:1px solid var(--border-pink);
+  padding:18px; overflow:hidden; isolation:isolate;
+}
+.keycard::before, .keycard::after{content:''; position:absolute; width:12px; height:12px; pointer-events:none; z-index:2;}
+.keycard::before{top:-1px; left:-1px; border-top:2px solid var(--pink); border-left:2px solid var(--pink);}
+.keycard::after{bottom:-1px; right:-1px; border-bottom:2px solid var(--pink); border-right:2px solid var(--pink);}
+.keycard .sweep{
+  position:absolute; top:0; left:-60%; width:40%; height:100%;
+  background:linear-gradient(100deg, transparent, rgba(255,43,214,.16), transparent);
+  transform:skewX(-18deg); transition:left 700ms var(--ease); z-index:1; pointer-events:none;
+}
+.keycard:hover .sweep{left:120%;}
+.keycard-top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:12px;}
+.keycard-str{font-family:var(--font-mono); font-size:15px; font-weight:600; letter-spacing:.04em; color:var(--text-primary); word-break:break-all;}
+.keycard-meta{display:flex; flex-wrap:wrap; gap:14px; font-family:var(--font-mono); font-size:11px; color:var(--text-secondary); margin-top:10px;}
+.keycard-meta span b{color:var(--text-primary); font-weight:600;}
+
+/* ===================== Activity feed ===================== */
+.feed{display:flex; flex-direction:column;}
+.feed-item{
+  display:flex; gap:12px; padding:11px 0; border-bottom:1px solid var(--border-soft);
+}
+.feed-item:last-child{border-bottom:none;}
+.feed-dot{width:8px; height:8px; border-radius:50%; margin-top:5px; flex:0 0 auto;}
+.feed-text{flex:1; font-size:13.5px; color:var(--text-primary);}
+.feed-time{font-family:var(--font-mono); font-size:11px; color:var(--text-muted); white-space:nowrap;}
+
+/* ===================== Chart ===================== */
+.chart-wrap{display:flex; align-items:flex-end; gap:10px; height:140px; padding-top:10px;}
+.chart-col{flex:1; display:flex; flex-direction:column; align-items:center; gap:8px; height:100%; justify-content:flex-end;}
+.chart-bar{width:100%; max-width:34px; background:linear-gradient(180deg, var(--pink), var(--pink-deep)); box-shadow:0 0 12px -2px var(--pink-glow); min-height:3px; transition:height 500ms var(--ease);}
+.chart-label{font-family:var(--font-mono); font-size:10px; color:var(--text-muted);}
+
+/* ===================== Result panel (redeem) ===================== */
+.result-box{padding:20px; border:1px dashed var(--border-soft-2); min-height:120px; display:flex; align-items:center; justify-content:center; text-align:center;}
+.result-box.success{border-color:var(--border-pink); background:var(--pink-glow-soft);}
+.result-box.error{border-color:rgba(255,59,92,.4); background:var(--crimson-bg);}
+.result-box .placeholder{color:var(--text-muted); font-family:var(--font-mono); font-size:12.5px;}
+
+/* ===================== Danger zone ===================== */
+.danger-zone{border:1px solid rgba(255,59,92,.35); background:var(--crimson-bg);}
+.danger-zone::before, .danger-zone::after{border-color:var(--crimson) !important;}
+.danger-zone .panel-title{color:var(--crimson-soft);}
+
+/* ===================== Modal ===================== */
+.modal-backdrop{
+  position:fixed; inset:0; background:rgba(4,3,8,.78); backdrop-filter:blur(3px);
+  display:flex; align-items:center; justify-content:center; z-index:200; padding:20px;
+  animation:fadein 160ms var(--ease);
+}
+.modal-box{
+  position:relative; width:100%; max-width:420px; background:var(--bg-panel-2);
+  border:1px solid var(--border-pink); padding:26px;
+}
+.modal-box::before, .modal-box::after{content:''; position:absolute; width:16px; height:16px;}
+.modal-box::before{top:-1px; left:-1px; border-top:2px solid var(--pink); border-left:2px solid var(--pink);}
+.modal-box::after{bottom:-1px; right:-1px; border-bottom:2px solid var(--pink); border-right:2px solid var(--pink);}
+.modal-box.danger::before, .modal-box.danger::after{border-color:var(--crimson);}
+.modal-box.danger{border-color:rgba(255,59,92,.5);}
+.modal-title{font-family:var(--font-display); font-size:16px; margin-bottom:10px;}
+.modal-body{color:var(--text-secondary); font-size:13.5px; margin-bottom:22px; line-height:1.6;}
+.modal-actions{display:flex; justify-content:flex-end; gap:10px;}
+
+/* ===================== Toasts ===================== */
+#toast-root{position:fixed; top:20px; right:20px; z-index:300; display:flex; flex-direction:column; gap:10px; max-width:340px;}
+.toast{
+  background:var(--bg-elevated); border:1px solid var(--border-soft-2); border-left:3px solid var(--pink);
+  padding:13px 14px; font-size:13px; color:var(--text-primary);
+  display:flex; align-items:flex-start; gap:10px;
+  animation:slidein 220ms var(--ease);
+  box-shadow:0 12px 30px -14px rgba(0,0,0,.6);
+}
+.toast svg{width:16px; height:16px; flex:0 0 auto; margin-top:1px;}
+.toast.error{border-left-color:var(--crimson);}
+.toast.warn{border-left-color:var(--amber);}
+@keyframes slidein{from{opacity:0; transform:translateX(30px);} to{opacity:1; transform:none;}}
+.toast.out{animation:slideout 200ms var(--ease) forwards;}
+@keyframes slideout{to{opacity:0; transform:translateX(30px);}}
+
+/* ===================== Misc ===================== */
+.divider{height:1px; background:var(--border-soft); margin:20px 0;}
+.search-row{display:flex; gap:12px; margin-bottom:18px; flex-wrap:wrap;}
+.search-row .input{max-width:280px;}
+.search-row select.input{max-width:170px;}
+.muted{color:var(--text-muted);}
+.flex-between{display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;}
+.tag-count{font-family:var(--font-mono); font-size:11px; color:var(--text-muted); border:1px solid var(--border-soft); padding:3px 8px;}
+
+@media (prefers-reduced-motion: reduce){
+  *{animation-duration:0.001ms !important; transition-duration:0.001ms !important;}
+}
+
+/* ===================== Checkboxes ===================== */
+.kw-checkbox{
+  -webkit-appearance:none; appearance:none;
+  width:17px; height:17px; border:1px solid var(--border-soft-2); background:var(--bg-input);
+  cursor:pointer; position:relative; flex:0 0 auto; transition:all var(--t-fast);
+}
+.kw-checkbox:checked{ background:var(--pink); border-color:var(--pink); box-shadow:0 0 8px var(--pink-glow); }
+.kw-checkbox:checked::after{
+  content:''; position:absolute; left:5px; top:1px; width:5px; height:9px;
+  border-right:2px solid #0a0612; border-bottom:2px solid #0a0612; transform:rotate(40deg);
+}
+.kw-checkbox:indeterminate{ background:var(--pink-deep); border-color:var(--pink); }
+
+/* ===================== Bulk action bar ===================== */
+.bulk-bar{
+  display:flex; align-items:center; gap:14px;
+  background:var(--pink-glow-soft); border:1px solid var(--border-pink);
+  padding:10px 14px; margin-bottom:14px; font-size:13px; color:var(--pink-soft);
+  animation:fadein var(--t-fast);
+}
+.bulk-bar .icon-btn{width:30px; height:30px;}
+
+/* ===================== Sortable headers ===================== */
+th.sortable{ cursor:pointer; user-select:none; position:relative; padding-right:22px !important; }
+th.sortable:hover{ color:var(--pink-soft); }
+th.sortable::after{
+  content:'↕'; position:absolute; right:8px; opacity:.35; font-size:11px;
+}
+th.sortable.sort-asc::after{ content:'↑'; opacity:1; color:var(--pink); }
+th.sortable.sort-desc::after{ content:'↓'; opacity:1; color:var(--pink); }
+
+/* ===================== Expiring-soon indicator ===================== */
+.expiring-flag{
+  display:inline-flex; align-items:center; gap:4px; font-family:var(--font-mono); font-size:10px;
+  color:var(--amber); margin-top:4px;
+}
+.expiring-flag::before{ content:''; width:5px; height:5px; border-radius:50%; background:var(--amber); box-shadow:0 0 6px var(--amber-glow); animation:blink 1.6s ease-in-out infinite; }
+
+/* ===================== Key detail modal ===================== */
+.modal-box.wide{ max-width:560px; }
+.kd-grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:16px 0; }
+@media (max-width:480px){ .kd-grid{ grid-template-columns:1fr; } }
+.kd-field{ font-size:12px; }
+.kd-field label{ display:block; font-family:var(--font-mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--text-muted); margin-bottom:4px; }
+.kd-field .val{ font-family:var(--font-mono); font-size:13px; color:var(--text-primary); }
+.kd-timeline{ max-height:160px; overflow-y:auto; border-top:1px solid var(--border-soft); padding-top:10px; margin-top:6px; }
+.kd-timeline .feed-item{ padding:8px 0; }
+.kd-note-row{ display:flex; gap:8px; align-items:flex-start; margin-top:4px; }
+.field-error{ color:var(--crimson-soft); font-size:11.5px; margin-top:6px; font-family:var(--font-mono); display:none; }
+.field-error.show{ display:block; }
+.input.invalid{ border-color:var(--crimson); box-shadow:0 0 0 3px var(--crimson-bg); }
+
+/* ===================== Print styles ===================== */
+@media print{
+  .sidebar, .topbar-actions, .bulk-bar, .icon-btn, #toast-root, #bg-canvas{ display:none !important; }
+  body{ background:#fff; color:#000; }
+  .panel, .stat-card{ border:1px solid #ccc; }
+}
+
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+
+<div id="loading-overlay">
+  <div class="loader-ring"></div>
+  <p>Abrindo o cofre…</p>
+</div>
+
+<div class="app" id="app" style="display:none;">
+
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 9.5a3.5 3.5 0 1 0-3.46 4.04L5 19.5V22h2.5l1-1h2v-2h2l1.46-1.46A3.5 3.5 0 0 0 18 14a3.5 3.5 0 0 0-3.5-3.5Z"/><circle cx="15" cy="9" r="1"/></svg>
+      </div>
+      <div class="brand-text">
+        <strong>KEY<span>WARDEN</span></strong>
+        <small>CONTROLE DE LICENÇAS</small>
+      </div>
+    </div>
+
+    <nav class="nav" id="nav">
+      <button class="nav-item active" data-page="dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+        <span class="label">Painel</span>
+      </button>
+      <button class="nav-item" data-page="generate">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 9.5a3.5 3.5 0 1 0-3.46 4.04L5 19.5V22h2.5l1-1h2v-2h2l1.46-1.46A3.5 3.5 0 0 0 18 14a3.5 3.5 0 0 0-3.5-3.5Z"/><path d="M19 4v4M17 6h4"/></svg>
+        <span class="label">Gerar chaves</span>
+      </button>
+      <button class="nav-item" data-page="manage">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="4" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="4" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="4" cy="18" r="1.4" fill="currentColor" stroke="none"/></svg>
+        <span class="label">Gerenciar chaves</span>
+      </button>
+      <button class="nav-item" data-page="redeem">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z"/><path d="m9 12 2 2 4-4"/></svg>
+        <span class="label">Testar resgate</span>
+      </button>
+      <button class="nav-item" data-page="activity">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>
+        <span class="label">Atividade</span>
+      </button>
+      <button class="nav-item" data-page="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a1.65 1.65 0 0 0 .33 1.82l.04.04a2 2 0 1 1-2.83 2.83l-.04-.04a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V19a2 2 0 1 1-4 0v-.07a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.04.04a2 2 0 1 1-2.83-2.83l.04-.04a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H4a2 2 0 1 1 0-4h.07a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.04-.04a2 2 0 1 1 2.83-2.83l.04.04a1.65 1.65 0 0 0 1.82.33h0A1.65 1.65 0 0 0 11 4.07V4a2 2 0 1 1 4 0v.07a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.04-.04a2 2 0 1 1 2.83 2.83l-.04.04a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H20a2 2 0 1 1 0 4h-.07a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+        <span class="label">Configurações</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-foot">
+      <div class="dot-line"><span class="dot"></span> Armazenamento conectado</div>
+      <div>v1.0 · simulação local</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow" id="page-eyebrow">/ PAINEL DE CONTROLE</div>
+        <h1 id="page-title">Visão geral do cofre</h1>
+      </div>
+      <div class="topbar-actions">
+        <div class="clock"><span class="dot"></span><span id="clock-text">--:--:--</span></div>
+      </div>
+    </header>
+
+    <!-- ================= DASHBOARD ================= -->
+    <section class="page" id="page-dashboard">
+      <div class="grid grid-stats" id="stat-grid" style="margin-bottom:22px;"></div>
+
+      <div class="row split" style="margin-bottom:0;">
+        <div class="col panel" style="flex:1.4;">
+          <div class="panel-title">Chaves geradas <small>últimos 7 dias</small></div>
+          <div class="chart-wrap" id="chart-wrap"></div>
+        </div>
+        <div class="col panel" style="flex:1;">
+          <div class="panel-title">Atividade recente <small id="activity-count-tag"></small></div>
+          <div class="feed" id="recent-feed"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= GENERATE ================= -->
+    <section class="page" id="page-generate" hidden>
+      <div class="row split">
+        <div class="col panel" style="flex:1;">
+          <div class="panel-title">Emitir novas chaves</div>
+          <form id="form-generate">
+            <div class="row wrap">
+              <div class="field col" style="min-width:140px;">
+                <label class="field-label">Prefixo</label>
+                <input class="input" id="gen-prefix" maxlength="8" placeholder="KW" style="text-transform:uppercase;">
+              </div>
+              <div class="field col" style="min-width:120px; max-width:140px;">
+                <label class="field-label">Quantidade</label>
+                <input class="input" id="gen-qty" type="number" min="1" max="100" value="1">
+              </div>
+            </div>
+
+            <div class="field">
+              <label class="field-label">Duração da licença</label>
+              <div class="row" style="gap:10px;">
+                <input class="input" id="gen-duration-value" type="number" min="1" value="30" style="max-width:110px;">
+                <select class="input" id="gen-duration-unit">
+                  <option value="hours">Horas</option>
+                  <option value="days" selected>Dias</option>
+                  <option value="weeks">Semanas</option>
+                  <option value="months">Meses</option>
+                  <option value="lifetime">Permanente</option>
+                </select>
+              </div>
+              <p class="help-text">A contagem só começa quando a chave for resgatada pela primeira vez — é nesse momento que o HWID é vinculado.</p>
+            </div>
+
+            <div class="field">
+              <label class="field-label">Observação (opcional)</label>
+              <input class="input" id="gen-note" placeholder="Ex: lote para clientes de junho">
+            </div>
+
+            <button class="btn btn-primary btn-block" type="submit">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 9.5a3.5 3.5 0 1 0-3.46 4.04L5 19.5V22h2.5l1-1h2v-2h2l1.46-1.46A3.5 3.5 0 0 0 18 14a3.5 3.5 0 0 0-3.5-3.5Z"/></svg>
+              Gerar chaves
+            </button>
+          </form>
+        </div>
+
+        <div class="col panel" style="flex:1.3;">
+          <div class="flex-between" style="margin-bottom:16px;">
+            <div class="panel-title" style="margin-bottom:0;">Chaves emitidas agora <small id="generated-now-tag"></small></div>
+            <div class="row" id="batch-actions" style="gap:8px; display:none;">
+              <button class="btn btn-ghost btn-sm" id="btn-copy-batch">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="1"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>
+                Copiar todas
+              </button>
+              <button class="btn btn-ghost btn-sm" id="btn-download-batch">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 19h16"/></svg>
+                Baixar .txt
+              </button>
+            </div>
+          </div>
+          <div id="generated-result">
+            <div class="empty-state">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="7" width="18" height="13" rx="1"/><path d="M7 7V5a5 5 0 0 1 10 0v2"/></svg>
+              <p>AS CHAVES GERADAS APARECEM AQUI</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= MANAGE ================= -->
+    <section class="page" id="page-manage" hidden>
+      <div class="panel">
+        <div class="flex-between" style="margin-bottom:16px;">
+          <div class="panel-title" style="margin-bottom:0;">Todas as chaves <small id="manage-count-tag"></small></div>
+          <div class="row" style="gap:8px;">
+            <button class="btn btn-ghost btn-sm" id="btn-export-csv">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5h5M6 3h8l5 5v13H6z"/></svg>
+              Exportar CSV
+            </button>
+            <button class="btn btn-ghost btn-sm" id="btn-export-quick">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 19h16"/></svg>
+              Exportar JSON
+            </button>
+          </div>
+        </div>
+
+        <div class="search-row">
+          <input class="input" id="manage-search" placeholder="Buscar por chave, HWID ou nota…">
+          <select class="input" id="manage-filter-status">
+            <option value="all">Todos os status</option>
+            <option value="unused">Não utilizada</option>
+            <option value="active">Ativa</option>
+            <option value="expiring">Expirando em 24h</option>
+            <option value="expired">Expirada</option>
+            <option value="banned">Banida</option>
+          </select>
+        </div>
+
+        <div class="bulk-bar" id="bulk-bar" style="display:none;">
+          <span class="mono" id="bulk-count">0 selecionadas</span>
+          <div class="row" style="gap:8px; margin-left:auto;">
+            <button class="btn btn-sm btn-ghost" data-bulk="reset">Resetar HWID</button>
+            <button class="btn btn-sm btn-ghost" data-bulk="extend">Estender</button>
+            <button class="btn btn-sm btn-ghost" data-bulk="ban">Banir</button>
+            <button class="btn btn-sm btn-danger" data-bulk="delete">Excluir</button>
+            <button class="icon-btn" data-bulk="clear" data-tip="Limpar seleção"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table class="kw-table">
+            <thead>
+              <tr>
+                <th style="width:36px;"><input type="checkbox" class="kw-checkbox" id="select-all"></th>
+                <th>Chave</th>
+                <th class="sortable" data-sort="status">Status</th>
+                <th>HWID vinculado</th>
+                <th class="sortable" data-sort="createdAt">Emitida em</th>
+                <th class="sortable" data-sort="expiresAt">Expira em</th>
+                <th class="sortable" data-sort="resetCount">Resets</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="manage-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= REDEEM (simulator) ================= -->
+    <section class="page" id="page-redeem" hidden>
+      <div class="row split">
+        <div class="col panel" style="flex:1;">
+          <div class="panel-title">Simulador de resgate <small>cliente</small></div>
+          <p class="help-text" style="margin-bottom:18px;">Simula o que o app/cliente do usuário faria: enviar a chave + a identificação única da máquina (HWID). Na primeira vez, o HWID é gravado na chave; nas próximas, ele precisa coincidir.</p>
+          <form id="form-redeem">
+            <div class="field">
+              <label class="field-label">Chave de licença</label>
+              <input class="input" id="redeem-key" placeholder="KW-XXXX-XXXX-XXXX-XXXX">
+            </div>
+            <div class="field">
+              <label class="field-label">HWID da máquina</label>
+              <div class="row" style="gap:10px;">
+                <input class="input" id="redeem-hwid" placeholder="HW-XXXXXXXXXXXX">
+                <button type="button" class="btn btn-ghost" id="btn-random-hwid" style="flex:0 0 auto;">Gerar HWID</button>
+              </div>
+              <p class="help-text">Em produção, o HWID viria de uma impressão digital real do hardware coletada pelo seu aplicativo cliente.</p>
+            </div>
+            <button class="btn btn-primary btn-block" type="submit">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 12 2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
+              Resgatar / validar chave
+            </button>
+          </form>
+        </div>
+
+        <div class="col panel" style="flex:1;">
+          <div class="panel-title">Resultado</div>
+          <div class="result-box" id="redeem-result">
+            <p class="placeholder">O resultado do resgate aparece aqui</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= ACTIVITY ================= -->
+    <section class="page" id="page-activity" hidden>
+      <div class="panel">
+        <div class="flex-between" style="margin-bottom:16px;">
+          <div class="panel-title" style="margin-bottom:0;">Histórico completo</div>
+          <select class="input" id="activity-filter" style="max-width:180px;">
+            <option value="all">Todos os eventos</option>
+            <option value="generate">Geração</option>
+            <option value="redeem">Resgate</option>
+            <option value="reset">Reset de HWID</option>
+            <option value="ban">Banimento</option>
+            <option value="extend">Extensão</option>
+            <option value="delete">Exclusão</option>
+            <option value="data">Dados (import/export/limpeza)</option>
+          </select>
+        </div>
+        <div class="feed" id="full-feed"></div>
+      </div>
+    </section>
+
+    <!-- ================= SETTINGS ================= -->
+    <section class="page" id="page-settings" hidden>
+      <div class="row split">
+        <div class="col panel" style="flex:1;">
+          <div class="panel-title">Preferências padrão</div>
+          <div class="field">
+            <label class="field-label">Prefixo padrão das chaves</label>
+            <input class="input" id="set-prefix" maxlength="8" style="text-transform:uppercase;">
+          </div>
+          <div class="field">
+            <label class="field-label">Duração padrão</label>
+            <div class="row" style="gap:10px;">
+              <input class="input" id="set-duration-value" type="number" min="1" style="max-width:110px;">
+              <select class="input" id="set-duration-unit">
+                <option value="hours">Horas</option>
+                <option value="days">Dias</option>
+                <option value="weeks">Semanas</option>
+                <option value="months">Meses</option>
+                <option value="lifetime">Permanente</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-primary" id="btn-save-settings">Salvar preferências</button>
+
+          <div class="divider"></div>
+
+          <div class="panel-title">Backup</div>
+          <p class="help-text" style="margin-bottom:14px;">Exporte todas as chaves e o histórico em um arquivo JSON, ou importe um backup salvo anteriormente.</p>
+          <div class="row" style="gap:10px;">
+            <button class="btn btn-ghost" id="btn-export-full">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 19h16"/></svg>
+              Exportar tudo
+            </button>
+            <button class="btn btn-ghost" id="btn-import-trigger">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V9m0 0-4 4m4-4 4 4"/><path d="M4 5h16"/></svg>
+              Importar backup
+            </button>
+            <input type="file" id="import-file" accept="application/json" hidden>
+          </div>
+        </div>
+
+        <div class="col panel danger-zone" style="flex:1;">
+          <div class="panel-title">Zona de risco</div>
+          <p class="help-text" style="margin-bottom:18px; color:var(--text-secondary);">Esta ação remove permanentemente todas as chaves, vínculos de HWID e o histórico de atividade armazenados neste painel. Não pode ser desfeita.</p>
+          <button class="btn btn-danger" id="btn-clear-all">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>
+            Apagar todos os dados
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div id="modal-root"></div>
+<div id="toast-root"></div>
+
+<script>
+(function(){
+"use strict";
+
+/* =========================================================
+   0. CONSTANTS & ICON LIBRARY
+========================================================= */
+var STORAGE_KEY = 'keywarden-state-v1';
+var CHARSET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sem caracteres ambíguos (O,0,I,1)
+var UNIT_LABEL = {hours:'horas', days:'dias', weeks:'semanas', months:'meses', lifetime:'permanente'};
+var UNIT_MS = {
+  hours: 3600000,
+  days: 86400000,
+  weeks: 604800000,
+  months: 2592000000 // aproximação de 30 dias
+};
+
+var ICON = {
+  copy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="1"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>',
+  reset:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>',
+  ban:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m6 6 12 12"/></svg>',
+  unban:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m9 12 2 2 4-4"/></svg>',
+  trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>',
+  clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>',
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m20 6-11 11-5-5"/></svg>',
+  alert:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><circle cx="12" cy="12" r="9"/><path d="M12 16h.01"/></svg>',
+  key:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 9.5a3.5 3.5 0 1 0-3.46 4.04L5 19.5V22h2.5l1-1h2v-2h2l1.46-1.46A3.5 3.5 0 0 0 18 14a3.5 3.5 0 0 0-3.5-3.5Z"/></svg>'
+};
+
+/* =========================================================
+   1. STATE
+========================================================= */
+var state = null;
+
+function defaultState(){
+  return {
+    keys: [],
+    activity: [],
+    settings: { defaultPrefix:'KW', defaultDurationValue:30, defaultDurationUnit:'days' }
+  };
+}
+
+function ensureDefaults(){
+  if(!state) state = defaultState();
+  if(!Array.isArray(state.keys)) state.keys = [];
+  if(!Array.isArray(state.activity)) state.activity = [];
+  if(!state.settings) state.settings = defaultState().settings;
+}
+
+async function loadState(){
+  try{
+    var res = await window.storage.get(STORAGE_KEY, false);
+    if(res && typeof res.value === 'string'){
+      state = JSON.parse(res.value);
+      ensureDefaults();
+    } else {
+      state = defaultState();
+      await persist();
+    }
+  }catch(e){
+    state = defaultState();
+    try{ await persist(); }catch(e2){ /* segue mesmo assim, em memória */ }
+  }
+}
+
+async function persist(){
+  try{
+    ensureDefaults();
+    var result = await window.storage.set(STORAGE_KEY, JSON.stringify(state), false);
+    if(!result){ toast('error', ICON.alert, 'Não foi possível salvar os dados.'); }
+    return result;
+  }catch(e){
+    toast('error', ICON.alert, 'Erro ao salvar no armazenamento.');
+    return null;
+  }
+}
+
+/* =========================================================
+   2. UTILITIES
+========================================================= */
+function uid(){ return 'k_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,9); }
+
+function randChar(){ return CHARSET[Math.floor(Math.random()*CHARSET.length)]; }
+
+function genKeySegment(len){
+  var s = '';
+  for(var i=0;i<len;i++) s += randChar();
+  return s;
+}
+
+function genKeyString(prefix){
+  var p = (prefix || 'KW').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8) || 'KW';
+  return [p, genKeySegment(4), genKeySegment(4), genKeySegment(4), genKeySegment(4)].join('-');
+}
+
+function genHwid(){
+  var hex = '0123456789ABCDEF';
+  var s = '';
+  for(var i=0;i<12;i++) s += hex[Math.floor(Math.random()*16)];
+  return 'HW-' + s;
+}
+
+function durationToMs(value, unit){
+  if(unit === 'lifetime') return null;
+  var v = Math.max(1, parseInt(value,10) || 1);
+  return v * (UNIT_MS[unit] || UNIT_MS.days);
+}
+
+function fmtDate(ts){
+  if(!ts) return '—';
+  var d = new Date(ts);
+  return d.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric'}) + ' ' +
+         d.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+}
+
+function fmtRelative(ts){
+  var diff = Date.now() - ts;
+  var abs = Math.abs(diff);
+  var mins = Math.round(abs/60000);
+  if(mins < 1) return 'agora mesmo';
+  if(mins < 60) return mins + (diff>0?' min atrás':'min restantes');
+  var hrs = Math.round(mins/60);
+  if(hrs < 24) return hrs + (diff>0?'h atrás':'h restantes');
+  var days = Math.round(hrs/24);
+  return days + (diff>0?'d atrás':'d restantes');
+}
+
+function escapeHtml(str){
+  return String(str==null?'':str).replace(/[&<>"']/g, function(c){
+    return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
+  });
+}
+
+function computeStatus(k, now){
+  now = now || Date.now();
+  if(k.banned) return 'banned';
+  if(!k.hwid) return 'unused';
+  if(k.expiresAt && now > k.expiresAt) return 'expired';
+  return 'active';
+}
+
+function statusLabel(s){
+  return {unused:'Não utilizada', active:'Ativa', expired:'Expirada', banned:'Banida'}[s] || s;
+}
+
+function logActivity(type, message){
+  state.activity.push({ id: uid(), type:type, message:message, timestamp: Date.now() });
+  if(state.activity.length > 500) state.activity = state.activity.slice(-500);
+}
+
+async function copyText(text){
+  try{
+    await navigator.clipboard.writeText(text);
+    toast('ok', ICON.check, 'Copiado para a área de transferência');
+  }catch(e){
+    try{
+      var ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta);
+      toast('ok', ICON.check, 'Copiado para a área de transferência');
+    }catch(e2){
+      toast('error', ICON.alert, 'Não foi possível copiar automaticamente');
+    }
+  }
+}
+
+/* =========================================================
+   3. KEY OPERATIONS
+========================================================= */
+function createKeys(count, prefix, durationValue, durationUnit, note){
+  var created = [];
+  var durationMs = durationToMs(durationValue, durationUnit);
+  for(var i=0;i<count;i++){
+    var k = {
+      id: uid(),
+      key: genKeyString(prefix),
+      prefix: (prefix||'KW').toUpperCase(),
+      durationValue: durationUnit==='lifetime' ? null : (parseInt(durationValue,10)||1),
+      durationUnit: durationUnit,
+      durationMs: durationMs,
+      createdAt: Date.now(),
+      firstUsedAt: null,
+      expiresAt: null,
+      hwid: null,
+      banned: false,
+      resetCount: 0,
+      lastResetAt: null,
+      note: note || ''
+    };
+    state.keys.unshift(k);
+    created.push(k);
+  }
+  var durTxt = durationUnit === 'lifetime' ? 'permanente' : (durationValue + ' ' + UNIT_LABEL[durationUnit]);
+  logActivity('generate', count + (count===1?' chave gerada':' chaves geradas') + ' (' + durTxt + ')' + (note ? ' — "'+note+'"' : ''));
+  return created;
+}
+
+function findKeyByString(str){
+  var norm = String(str||'').trim().toUpperCase();
+  return state.keys.find(function(k){ return k.key === norm; });
+}
+
+function redeemKey(keyStr, hwid){
+  var norm = String(keyStr||'').trim().toUpperCase();
+  var hw = String(hwid||'').trim();
+  if(!norm || !hw){
+    return {ok:false, code:'missing', msg:'Informe a chave e o HWID antes de continuar.'};
+  }
+  var k = findKeyByString(norm);
+  if(!k){
+    return {ok:false, code:'notfound', msg:'Nenhuma chave encontrada com esse valor.'};
+  }
+  if(k.banned){
+    return {ok:false, code:'banned', msg:'Esta chave foi banida e não pode mais ser usada.', key:k};
+  }
+  var now = Date.now();
+  if(!k.hwid){
+    // primeira ativação — vincula o HWID
+    k.hwid = hw;
+    k.firstUsedAt = now;
+    k.expiresAt = k.durationMs ? now + k.durationMs : null;
+    logActivity('redeem', 'Chave ' + k.key + ' ativada pela primeira vez — HWID ' + hw + ' vinculado.');
+    return {ok:true, code:'bound', msg:'Chave ativada com sucesso! HWID vinculado nesta primeira utilização.', key:k};
+  }
+  if(k.hwid !== hw){
+    logActivity('redeem', 'Tentativa de uso da chave ' + k.key + ' com HWID divergente (' + hw + ').');
+    return {ok:false, code:'mismatch', msg:'Esta chave já está vinculada a outra máquina (HWID não corresponde).', key:k};
+  }
+  var st = computeStatus(k, now);
+  if(st === 'expired'){
+    return {ok:false, code:'expired', msg:'A validade desta chave já terminou.', key:k};
+  }
+  logActivity('redeem', 'Chave ' + k.key + ' validada novamente no mesmo HWID.');
+  return {ok:true, code:'valid', msg:'Chave válida — acesso liberado para este HWID.', key:k};
+}
+
+function resetHwid(id){
+  var k = state.keys.find(function(x){ return x.id === id; });
+  if(!k) return;
+  k.hwid = null;
+  k.firstUsedAt = null;
+  k.expiresAt = null;
+  k.resetCount = (k.resetCount||0) + 1;
+  k.lastResetAt = Date.now();
+  logActivity('reset', 'HWID resetado para a chave ' + k.key + ' (reset nº ' + k.resetCount + ').');
+}
+
+function toggleBan(id){
+  var k = state.keys.find(function(x){ return x.id === id; });
+  if(!k) return;
+  k.banned = !k.banned;
+  logActivity('ban', 'Chave ' + k.key + (k.banned ? ' foi banida.' : ' foi desbanida.'));
+}
+
+function extendKey(id, addValue, addUnit){
+  var k = state.keys.find(function(x){ return x.id === id; });
+  if(!k) return;
+  var addMs = durationToMs(addValue, addUnit);
+  if(addMs === null){
+    k.expiresAt = null;
+    k.durationUnit = 'lifetime';
+  } else {
+    var base = k.expiresAt && k.expiresAt > Date.now() ? k.expiresAt : Date.now();
+    k.expiresAt = base + addMs;
+  }
+  logActivity('extend', 'Validade da chave ' + k.key + ' estendida em ' + addValue + ' ' + UNIT_LABEL[addUnit] + '.');
+}
+
+function deleteKey(id){
+  var k = state.keys.find(function(x){ return x.id === id; });
+  if(!k) return;
+  state.keys = state.keys.filter(function(x){ return x.id !== id; });
+  logActivity('delete', 'Chave ' + k.key + ' excluída permanentemente.');
+}
+
+/* =========================================================
+   4. TOASTS
+========================================================= */
+function toast(type, icon, msg){
+  var root = document.getElementById('toast-root');
+  var el = document.createElement('div');
+  el.className = 'toast' + (type==='error' ? ' error' : (type==='warn' ? ' warn' : ''));
+  el.innerHTML = '<span style="color:' + (type==='error' ? 'var(--crimson)' : (type==='warn' ? 'var(--amber)' : 'var(--pink)')) + '">' + icon + '</span><span>' + escapeHtml(msg) + '</span>';
+  root.appendChild(el);
+  setTimeout(function(){
+    el.classList.add('out');
+    setTimeout(function(){ el.remove(); }, 220);
+  }, 3600);
+}
+
+/* =========================================================
+   5. MODAL
+========================================================= */
+function showModal(opts){
+  var root = document.getElementById('modal-root');
+  var backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.innerHTML =
+    '<div class="modal-box' + (opts.danger ? ' danger' : '') + '">' +
+      '<div class="modal-title">' + escapeHtml(opts.title) + '</div>' +
+      '<div class="modal-body">' + opts.body + '</div>' +
+      '<div class="modal-actions">' +
+        '<button class="btn btn-ghost" id="modal-cancel">Cancelar</button>' +
+        '<button class="btn ' + (opts.danger ? 'btn-danger' : 'btn-primary') + '" id="modal-confirm">' + escapeHtml(opts.confirmText || 'Confirmar') + '</button>' +
+      '</div>' +
+    '</div>';
+  root.appendChild(backdrop);
+
+  function close(){ backdrop.remove(); }
+  backdrop.addEventListener('click', function(e){ if(e.target === backdrop) close(); });
+  backdrop.querySelector('#modal-cancel').addEventListener('click', close);
+  backdrop.querySelector('#modal-confirm').addEventListener('click', function(){
+    close();
+    opts.onConfirm && opts.onConfirm();
+  });
+}
+
+/* =========================================================
+   6. NAVIGATION
+========================================================= */
+var PAGE_META = {
+  dashboard:{eyebrow:'/ PAINEL DE CONTROLE', title:'Visão geral do cofre'},
+  generate:{eyebrow:'/ EMISSÃO', title:'Gerar novas chaves'},
+  manage:{eyebrow:'/ INVENTÁRIO', title:'Gerenciar chaves'},
+  redeem:{eyebrow:'/ SIMULAÇÃO', title:'Testar resgate de chave'},
+  activity:{eyebrow:'/ REGISTRO', title:'Histórico de atividade'},
+  settings:{eyebrow:'/ SISTEMA', title:'Configurações'}
+};
+
+function goToPage(page){
+  document.querySelectorAll('.page').forEach(function(p){ p.hidden = (p.id !== 'page-' + page); });
+  document.querySelectorAll('.nav-item').forEach(function(b){ b.classList.toggle('active', b.dataset.page === page); });
+  document.getElementById('page-eyebrow').textContent = PAGE_META[page].eyebrow;
+  document.getElementById('page-title').textContent = PAGE_META[page].title;
+  if(page === 'dashboard') renderDashboard();
+  if(page === 'manage') renderManageTable();
+  if(page === 'activity') renderActivityPage();
+  if(page === 'settings') renderSettingsPage();
+}
+
+/* =========================================================
+   7. RENDER: DASHBOARD
+========================================================= */
+function renderDashboard(){
+  var now = Date.now();
+  var counts = {unused:0, active:0, expired:0, banned:0};
+  state.keys.forEach(function(k){ counts[computeStatus(k, now)]++; });
+  var total = state.keys.length;
+
+  var statCfg = [
+    {label:'Total de chaves', value:total, color:'var(--pink)', sub:'emitidas no total'},
+    {label:'Ativas', value:counts.active, color:'var(--pink)', sub:'vinculadas e válidas'},
+    {label:'Não utilizadas', value:counts.unused, color:'var(--slate)', sub:'aguardando 1ª ativação'},
+    {label:'Expiradas', value:counts.expired, color:'var(--amber)', sub:'validade encerrada'},
+    {label:'Banidas', value:counts.banned, color:'var(--crimson)', sub:'bloqueadas manualmente'}
+  ];
+
+  var grid = document.getElementById('stat-grid');
+  grid.innerHTML = statCfg.map(function(s){
+    return '<div class="stat-card" style="--stat-color:' + s.color + '">' +
+      '<div class="eyebrow">' + escapeHtml(s.label) + '</div>' +
+      '<div class="num">' + s.value + '</div>' +
+      '<div class="sub">' + escapeHtml(s.sub) + '</div>' +
+    '</div>';
+  }).join('');
+
+  // chart: keys generated per day, last 7 days
+  var days = [];
+  for(var i=6;i>=0;i--){
+    var d = new Date(now - i*86400000);
+    days.push({ key: d.toDateString(), label: d.toLocaleDateString('pt-BR',{weekday:'short'}).replace('.',''), count:0 });
+  }
+  state.activity.forEach(function(a){
+    if(a.type !== 'generate') return;
+    var d = new Date(a.timestamp).toDateString();
+    var match = days.find(function(x){ return x.key === d; });
+    if(match){
+      var m = /^(\d+)/.exec(a.message);
+      match.count += m ? parseInt(m[1],10) : 1;
+    }
+  });
+  var maxCount = Math.max(1, Math.max.apply(null, days.map(function(d){ return d.count; })));
+  var chartWrap = document.getElementById('chart-wrap');
+  chartWrap.innerHTML = days.map(function(d){
+    var h = Math.max(3, Math.round((d.count / maxCount) * 110));
+    return '<div class="chart-col">' +
+      '<div class="chart-bar" style="height:' + h + 'px;" title="' + d.count + ' chave(s)"></div>' +
+      '<div class="chart-label">' + escapeHtml(d.label.toUpperCase()) + '</div>' +
+    '</div>';
+  }).join('');
+
+  // recent activity feed (last 8)
+  var feed = document.getElementById('recent-feed');
+  var recent = state.activity.slice(-8).reverse();
+  document.getElementById('activity-count-tag').textContent = state.activity.length + ' eventos no total';
+  if(recent.length === 0){
+    feed.innerHTML = '<div class="empty-state"><p>NENHUMA ATIVIDADE AINDA</p></div>';
+  } else {
+    feed.innerHTML = recent.map(feedItemHtml).join('');
+  }
+}
+
+function activityColor(type){
+  return {generate:'var(--pink)', redeem:'var(--pink-soft)', reset:'var(--amber)', ban:'var(--crimson)', extend:'var(--pink-soft)', delete:'var(--crimson)', data:'var(--slate)'}[type] || 'var(--slate)';
+}
+
+function feedItemHtml(a){
+  return '<div class="feed-item">' +
+    '<span class="feed-dot" style="background:' + activityColor(a.type) + '; box-shadow:0 0 6px ' + activityColor(a.type) + ';"></span>' +
+    '<span class="feed-text">' + escapeHtml(a.message) + '</span>' +
+    '<span class="feed-time">' + fmtRelative(a.timestamp) + '</span>' +
+  '</div>';
+}
+
+/* =========================================================
+   8. RENDER: GENERATE PAGE RESULT
+========================================================= */
+function renderGeneratedResult(createdKeys){
+  var box = document.getElementById('generated-result');
+  document.getElementById('generated-now-tag').textContent = createdKeys.length + ' nesta sessão';
+  box.innerHTML = createdKeys.map(function(k){
+    var durTxt = k.durationUnit === 'lifetime' ? 'Permanente' : (k.durationValue + ' ' + UNIT_LABEL[k.durationUnit]);
+    return '<div class="keycard" style="margin-bottom:12px;">' +
+      '<div class="sweep"></div>' +
+      '<div class="keycard-top">' +
+        '<span class="keycard-str">' + escapeHtml(k.key) + '</span>' +
+        '<button class="icon-btn" data-copy="' + escapeHtml(k.key) + '" data-tip="Copiar">' + ICON.copy + '</button>' +
+      '</div>' +
+      '<span class="badge badge-unused">Não utilizada</span>' +
+      '<div class="keycard-meta">' +
+        '<span>Duração: <b>' + escapeHtml(durTxt) + '</b></span>' +
+        '<span>Emitida: <b>' + fmtDate(k.createdAt) + '</b></span>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+  box.querySelectorAll('[data-copy]').forEach(function(btn){
+    btn.addEventListener('click', function(){ copyText(btn.dataset.copy); });
+  });
+}
+
+/* =========================================================
+   9. RENDER: MANAGE TABLE
+========================================================= */
+var selectedIds = new Set();
+var sortField = null;
+var sortDir = 'asc';
+
+function isExpiringSoon(k, now){
+  return !!(k.hwid && !k.banned && k.expiresAt && now < k.expiresAt && (k.expiresAt - now) < 86400000);
+}
+
+function sortKeys(list, now){
+  if(!sortField) return list;
+  var sorted = list.slice().sort(function(a,b){
+    var va, vb;
+    if(sortField === 'status'){ va = computeStatus(a, now); vb = computeStatus(b, now); }
+    else if(sortField === 'createdAt'){ va = a.createdAt || 0; vb = b.createdAt || 0; }
+    else if(sortField === 'expiresAt'){ va = a.expiresAt == null ? Infinity : a.expiresAt; vb = b.expiresAt == null ? Infinity : b.expiresAt; }
+    else if(sortField === 'resetCount'){ va = a.resetCount || 0; vb = b.resetCount || 0; }
+    if(va < vb) return sortDir === 'asc' ? -1 : 1;
+    if(va > vb) return sortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
+  return sorted;
+}
+
+function renderManageTable(){
+  var search = (document.getElementById('manage-search').value || '').trim().toUpperCase();
+  var filterStatus = document.getElementById('manage-filter-status').value;
+  var now = Date.now();
+
+  var filtered = state.keys.filter(function(k){
+    if(filterStatus === 'expiring'){
+      if(!isExpiringSoon(k, now)) return false;
+    } else if(filterStatus !== 'all'){
+      var st = computeStatus(k, now);
+      if(st !== filterStatus) return false;
+    }
+    if(search){
+      var hay = (k.key + ' ' + (k.hwid||'') + ' ' + (k.note||'')).toUpperCase();
+      if(hay.indexOf(search) === -1) return false;
+    }
+    return true;
+  });
+
+  filtered = sortKeys(filtered, now);
+
+  document.getElementById('manage-count-tag').textContent = filtered.length + ' de ' + state.keys.length;
+  document.querySelectorAll('th.sortable').forEach(function(th){
+    th.classList.remove('sort-asc','sort-desc');
+    if(th.dataset.sort === sortField) th.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+  });
+
+  var tbody = document.getElementById('manage-tbody');
+  if(filtered.length === 0){
+    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>' +
+      '<p>NENHUMA CHAVE ENCONTRADA</p></div></td></tr>';
+    updateBulkBar();
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(function(k){
+    var st = computeStatus(k, now);
+    var rowCls = st === 'banned' ? ' class="is-banned"' : '';
+    var expiringTag = isExpiringSoon(k, now) ? '<div class="expiring-flag">expira em breve</div>' : '';
+    var checked = selectedIds.has(k.id) ? ' checked' : '';
+    return '<tr' + rowCls + '>' +
+      '<td><input type="checkbox" class="kw-checkbox row-checkbox" data-id="' + k.id + '"' + checked + '></td>' +
+      '<td><span class="key-chip" data-id="' + k.id + '" style="cursor:pointer;">' + escapeHtml(k.key) +
+        '<button class="icon-btn" style="width:24px;height:24px;" data-act="copy" data-id="' + k.id + '" data-tip="Copiar">' + ICON.copy + '</button>' +
+      '</span>' + (k.note ? '<div class="help-text" style="margin-top:4px;">' + escapeHtml(k.note) + '</div>' : '') + '</td>' +
+      '<td><span class="badge badge-' + st + '">' + statusLabel(st) + '</span>' + expiringTag + '</td>' +
+      '<td><span class="hwid-chip' + (k.hwid?'':' empty') + '">' + (k.hwid ? escapeHtml(k.hwid) : 'não vinculado') + '</span></td>' +
+      '<td class="mono" style="font-size:12px; color:var(--text-secondary);">' + fmtDate(k.createdAt) + '</td>' +
+      '<td class="mono" style="font-size:12px; color:var(--text-secondary);">' + (k.durationUnit==='lifetime' ? 'Nunca' : fmtDate(k.expiresAt)) + '</td>' +
+      '<td class="mono" style="font-size:12px;">' + (k.resetCount||0) + '</td>' +
+      '<td><div class="cell-actions">' +
+        '<button class="icon-btn" data-act="reset" data-id="' + k.id + '" data-tip="Resetar HWID">' + ICON.reset + '</button>' +
+        '<button class="icon-btn" data-act="extend" data-id="' + k.id + '" data-tip="Estender validade">' + ICON.clock + '</button>' +
+        '<button class="icon-btn' + (k.banned?'':' danger') + '" data-act="ban" data-id="' + k.id + '" data-tip="' + (k.banned?'Desbanir':'Banir') + '">' + (k.banned ? ICON.unban : ICON.ban) + '</button>' +
+        '<button class="icon-btn danger" data-act="delete" data-id="' + k.id + '" data-tip="Excluir">' + ICON.trash + '</button>' +
+      '</div></td>' +
+    '</tr>';
+  }).join('');
+
+  updateBulkBar();
+  var selectAll = document.getElementById('select-all');
+  var idsOnScreen = filtered.map(function(k){ return k.id; });
+  var selectedOnScreen = idsOnScreen.filter(function(id){ return selectedIds.has(id); });
+  selectAll.checked = idsOnScreen.length > 0 && selectedOnScreen.length === idsOnScreen.length;
+  selectAll.indeterminate = selectedOnScreen.length > 0 && selectedOnScreen.length < idsOnScreen.length;
+}
+
+function updateBulkBar(){
+  var bar = document.getElementById('bulk-bar');
+  var count = selectedIds.size;
+  if(count === 0){ bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  document.getElementById('bulk-count').textContent = count + (count === 1 ? ' chave selecionada' : ' chaves selecionadas');
+}
+
+function bindManageActions(){
+  var tbody = document.getElementById('manage-tbody');
+
+  tbody.addEventListener('click', function(e){
+    var actBtn = e.target.closest('[data-act]');
+    if(actBtn){
+      var id = actBtn.dataset.id;
+      var act = actBtn.dataset.act;
+      var k = state.keys.find(function(x){ return x.id === id; });
+      if(!k) return;
+
+      if(act === 'copy'){ copyText(k.key); return; }
+
+      if(act === 'reset'){
+        showModal({
+          title:'Resetar HWID',
+          body:'A chave <span class="mono" style="color:var(--pink-soft)">' + escapeHtml(k.key) + '</span> será desvinculada da máquina atual e poderá ser ativada novamente em qualquer dispositivo, recomeçando a contagem de validade na próxima ativação.',
+          confirmText:'Resetar HWID',
+          onConfirm: async function(){
+            resetHwid(id); await persist(); renderManageTable(); renderDashboard();
+            toast('ok', ICON.check, 'HWID resetado com sucesso.');
+          }
+        });
+        return;
+      }
+
+      if(act === 'ban'){
+        var willBan = !k.banned;
+        showModal({
+          title: willBan ? 'Banir chave' : 'Desbanir chave',
+          body: willBan
+            ? 'A chave <span class="mono" style="color:var(--pink-soft)">' + escapeHtml(k.key) + '</span> deixará de validar mesmo que o HWID corresponda.'
+            : 'A chave <span class="mono" style="color:var(--pink-soft)">' + escapeHtml(k.key) + '</span> voltará a validar normalmente.',
+          confirmText: willBan ? 'Banir' : 'Desbanir',
+          danger: willBan,
+          onConfirm: async function(){
+            toggleBan(id); await persist(); renderManageTable(); renderDashboard();
+            toast(willBan?'warn':'ok', willBan?ICON.ban:ICON.check, willBan ? 'Chave banida.' : 'Chave desbanida.');
+          }
+        });
+        return;
+      }
+
+      if(act === 'delete'){
+        showModal({
+          title:'Excluir chave permanentemente',
+          body:'Esta ação não pode ser desfeita. A chave <span class="mono" style="color:var(--pink-soft)">' + escapeHtml(k.key) + '</span> e seu histórico de vínculo serão removidos.',
+          confirmText:'Excluir',
+          danger:true,
+          onConfirm: async function(){
+            deleteKey(id); selectedIds.delete(id); await persist(); renderManageTable(); renderDashboard();
+            toast('ok', ICON.check, 'Chave excluída.');
+          }
+        });
+        return;
+      }
+
+      if(act === 'extend'){ openExtendModal(k); return; }
+      return;
+    }
+
+    var chip = e.target.closest('.key-chip');
+    if(chip){
+      var kk = state.keys.find(function(x){ return x.id === chip.dataset.id; });
+      if(kk) openKeyDetailModal(kk);
+    }
+  });
+
+  tbody.addEventListener('change', function(e){
+    var cb = e.target.closest('.row-checkbox');
+    if(!cb) return;
+    if(cb.checked) selectedIds.add(cb.dataset.id);
+    else selectedIds.delete(cb.dataset.id);
+    updateBulkBar();
+    var selectAll = document.getElementById('select-all');
+    var rows = tbody.querySelectorAll('.row-checkbox');
+    var total = rows.length, checked = tbody.querySelectorAll('.row-checkbox:checked').length;
+    selectAll.checked = total > 0 && checked === total;
+    selectAll.indeterminate = checked > 0 && checked < total;
+  });
+}
+
+function openKeyDetailModal(k){
+  var now = Date.now();
+  var st = computeStatus(k, now);
+  var related = state.activity.filter(function(a){ return a.message.indexOf(k.key) !== -1; }).slice(-12).reverse();
+  var root = document.getElementById('modal-root');
+  var backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.innerHTML =
+    '<div class="modal-box wide">' +
+      '<div class="modal-title mono" style="font-size:14px;">' + escapeHtml(k.key) + ' <span class="badge badge-' + st + '" style="margin-left:8px;">' + statusLabel(st) + '</span></div>' +
+      '<div class="kd-grid">' +
+        '<div class="kd-field"><label>HWID vinculado</label><div class="val">' + (k.hwid ? escapeHtml(k.hwid) : '— não vinculado —') + '</div></div>' +
+        '<div class="kd-field"><label>Resets realizados</label><div class="val">' + (k.resetCount||0) + '</div></div>' +
+        '<div class="kd-field"><label>Emitida em</label><div class="val">' + fmtDate(k.createdAt) + '</div></div>' +
+        '<div class="kd-field"><label>Primeira ativação</label><div class="val">' + (k.firstUsedAt ? fmtDate(k.firstUsedAt) : '—') + '</div></div>' +
+        '<div class="kd-field"><label>Expira em</label><div class="val">' + (k.durationUnit==='lifetime' ? 'Nunca (permanente)' : fmtDate(k.expiresAt)) + '</div></div>' +
+        '<div class="kd-field"><label>Último reset</label><div class="val">' + (k.lastResetAt ? fmtDate(k.lastResetAt) : '—') + '</div></div>' +
+      '</div>' +
+      '<div class="field" style="margin-bottom:10px;">' +
+        '<label class="field-label">Observação</label>' +
+        '<div class="kd-note-row">' +
+          '<input class="input" id="kd-note-input" value="' + escapeHtml(k.note||'') + '" placeholder="Sem observação">' +
+          '<button class="btn btn-ghost btn-sm" id="kd-note-save">Salvar</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="kd-field"><label>Linha do tempo desta chave</label></div>' +
+      '<div class="kd-timeline">' + (related.length ? related.map(feedItemHtml).join('') : '<p class="help-text">Nenhum evento registrado ainda.</p>') + '</div>' +
+      '<div class="modal-actions" style="margin-top:18px;">' +
+        '<button class="btn btn-ghost" id="modal-cancel">Fechar</button>' +
+      '</div>' +
+    '</div>';
+  root.appendChild(backdrop);
+  function close(){ backdrop.remove(); }
+  backdrop.addEventListener('click', function(e){ if(e.target === backdrop) close(); });
+  backdrop.querySelector('#modal-cancel').addEventListener('click', close);
+  backdrop.querySelector('#kd-note-save').addEventListener('click', async function(){
+    k.note = document.getElementById('kd-note-input').value.trim();
+    await persist(); renderManageTable();
+    toast('ok', ICON.check, 'Observação salva.');
+    close();
+  });
+}
+
+function openExtendModal(k){
+  var root = document.getElementById('modal-root');
+  var backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.innerHTML =
+    '<div class="modal-box">' +
+      '<div class="modal-title">Estender validade</div>' +
+      '<div class="modal-body">Adicionar tempo à chave <span class="mono" style="color:var(--pink-soft)">' + escapeHtml(k.key) + '</span>.' +
+        '<div class="row" style="gap:10px; margin-top:14px;">' +
+          '<input class="input" id="extend-value" type="number" min="1" value="30" style="max-width:110px;">' +
+          '<select class="input" id="extend-unit">' +
+            '<option value="hours">Horas</option>' +
+            '<option value="days" selected>Dias</option>' +
+            '<option value="weeks">Semanas</option>' +
+            '<option value="months">Meses</option>' +
+            '<option value="lifetime">Tornar permanente</option>' +
+          '</select>' +
+        '</div>' +
+      '</div>' +
+      '<div class="modal-actions">' +
+        '<button class="btn btn-ghost" id="modal-cancel">Cancelar</button>' +
+        '<button class="btn btn-primary" id="modal-confirm">Estender</button>' +
+      '</div>' +
+    '</div>';
+  root.appendChild(backdrop);
+  function close(){ backdrop.remove(); }
+  backdrop.addEventListener('click', function(e){ if(e.target===backdrop) close(); });
+  backdrop.querySelector('#modal-cancel').addEventListener('click', close);
+  backdrop.querySelector('#modal-confirm').addEventListener('click', async function(){
+    var val = parseInt(document.getElementById('extend-value').value,10) || 1;
+    var unit = document.getElementById('extend-unit').value;
+    close();
+    extendKey(k.id, val, unit);
+    await persist(); renderManageTable(); renderDashboard();
+    toast('ok', ICON.check, 'Validade atualizada.');
+  });
+}
+
+function openBulkExtendModal(ids){
+  var root = document.getElementById('modal-root');
+  var backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.innerHTML =
+    '<div class="modal-box">' +
+      '<div class="modal-title">Estender validade em massa</div>' +
+      '<div class="modal-body">Adicionar tempo a <b>' + ids.length + '</b> chave(s) selecionada(s).' +
+        '<div class="row" style="gap:10px; margin-top:14px;">' +
+          '<input class="input" id="bulk-extend-value" type="number" min="1" value="30" style="max-width:110px;">' +
+          '<select class="input" id="bulk-extend-unit">' +
+            '<option value="hours">Horas</option>' +
+            '<option value="days" selected>Dias</option>' +
+            '<option value="weeks">Semanas</option>' +
+            '<option value="months">Meses</option>' +
+            '<option value="lifetime">Tornar permanente</option>' +
+          '</select>' +
+        '</div>' +
+      '</div>' +
+      '<div class="modal-actions">' +
+        '<button class="btn btn-ghost" id="modal-cancel">Cancelar</button>' +
+        '<button class="btn btn-primary" id="modal-confirm">Estender todas</button>' +
+      '</div>' +
+    '</div>';
+  root.appendChild(backdrop);
+  function close(){ backdrop.remove(); }
+  backdrop.addEventListener('click', function(e){ if(e.target===backdrop) close(); });
+  backdrop.querySelector('#modal-cancel').addEventListener('click', close);
+  backdrop.querySelector('#modal-confirm').addEventListener('click', async function(){
+    var val = parseInt(document.getElementById('bulk-extend-value').value,10) || 1;
+    var unit = document.getElementById('bulk-extend-unit').value;
+    close();
+    ids.forEach(function(id){ extendKey(id, val, unit); });
+    selectedIds.clear();
+    await persist(); renderManageTable(); renderDashboard();
+    toast('ok', ICON.check, ids.length + ' chave(s) atualizada(s).');
+  });
+}
+
+function bulkAction(type){
+  var ids = Array.from(selectedIds);
+  if(type === 'clear'){ selectedIds.clear(); renderManageTable(); return; }
+  if(ids.length === 0) return;
+
+  if(type === 'reset'){
+    showModal({
+      title:'Resetar HWID em massa',
+      body: ids.length + ' chave(s) selecionada(s) terão o HWID removido e poderão ser ativadas novamente em outra máquina.',
+      confirmText:'Resetar todas',
+      onConfirm: async function(){
+        ids.forEach(resetHwid); selectedIds.clear();
+        await persist(); renderManageTable(); renderDashboard();
+        toast('ok', ICON.check, ids.length + ' chave(s) resetada(s).');
+      }
+    });
+    return;
+  }
+  if(type === 'ban'){
+    showModal({
+      title:'Banir em massa',
+      body: ids.length + ' chave(s) selecionada(s) serão banidas e deixarão de validar, mesmo com HWID correto.',
+      confirmText:'Banir todas',
+      danger:true,
+      onConfirm: async function(){
+        ids.forEach(function(id){ var k = state.keys.find(function(x){ return x.id===id; }); if(k && !k.banned) toggleBan(id); });
+        selectedIds.clear();
+        await persist(); renderManageTable(); renderDashboard();
+        toast('warn', ICON.ban, ids.length + ' chave(s) banida(s).');
+      }
+    });
+    return;
+  }
+  if(type === 'delete'){
+    showModal({
+      title:'Excluir em massa',
+      body: ids.length + ' chave(s) selecionada(s) serão excluídas permanentemente. Esta ação não pode ser desfeita.',
+      confirmText:'Excluir todas',
+      danger:true,
+      onConfirm: async function(){
+        ids.forEach(deleteKey); selectedIds.clear();
+        await persist(); renderManageTable(); renderDashboard();
+        toast('ok', ICON.check, ids.length + ' chave(s) excluída(s).');
+      }
+    });
+    return;
+  }
+  if(type === 'extend'){ openBulkExtendModal(ids); return; }
+}
+
+function exportCSV(){
+  try{
+    var now = Date.now();
+    var rows = [['Chave','Status','HWID','Emitida em','Expira em','Resets','Nota']];
+    state.keys.forEach(function(k){
+      rows.push([
+        k.key,
+        statusLabel(computeStatus(k, now)),
+        k.hwid || '',
+        fmtDate(k.createdAt),
+        k.durationUnit === 'lifetime' ? 'Nunca' : fmtDate(k.expiresAt),
+        String(k.resetCount || 0),
+        k.note || ''
+      ]);
+    });
+    var csv = rows.map(function(r){
+      return r.map(function(c){ return '"' + String(c).replace(/"/g,'""') + '"'; }).join(',');
+    }).join('\n');
+    var blob = new Blob([csv], {type:'text/csv'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = 'keywarden-chaves-' + Date.now() + '.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    logActivity('data', 'Lista de chaves exportada em CSV (' + state.keys.length + ' chaves).');
+    persist();
+    toast('ok', ICON.check, 'CSV exportado.');
+  }catch(e){
+    toast('error', ICON.alert, 'Falha ao exportar CSV.');
+  }
+}
+
+/* =========================================================
+   10. RENDER: ACTIVITY PAGE
+========================================================= */
+function renderActivityPage(){
+  var filter = document.getElementById('activity-filter').value;
+  var list = state.activity.slice().reverse();
+  if(filter !== 'all'){
+    if(filter === 'data'){
+      list = list.filter(function(a){ return a.type === 'data'; });
+    } else {
+      list = list.filter(function(a){ return a.type === filter; });
+    }
+  }
+  var feed = document.getElementById('full-feed');
+  if(list.length === 0){
+    feed.innerHTML = '<div class="empty-state"><p>NENHUM EVENTO PARA ESTE FILTRO</p></div>';
+    return;
+  }
+  feed.innerHTML = list.map(function(a){
+    return '<div class="feed-item">' +
+      '<span class="feed-dot" style="background:' + activityColor(a.type) + '; box-shadow:0 0 6px ' + activityColor(a.type) + ';"></span>' +
+      '<span class="feed-text">' + escapeHtml(a.message) + '<br><span class="mono" style="font-size:10.5px; color:var(--text-muted);">' + fmtDate(a.timestamp) + '</span></span>' +
+    '</div>';
+  }).join('');
+}
+
+/* =========================================================
+   11. RENDER: SETTINGS PAGE
+========================================================= */
+function renderSettingsPage(){
+  document.getElementById('set-prefix').value = state.settings.defaultPrefix;
+  document.getElementById('set-duration-value').value = state.settings.defaultDurationValue;
+  document.getElementById('set-duration-unit').value = state.settings.defaultDurationUnit;
+}
+
+/* =========================================================
+   12. EVENT WIRING
+========================================================= */
+function wireNav(){
+  document.getElementById('nav').addEventListener('click', function(e){
+    var btn = e.target.closest('.nav-item');
+    if(!btn) return;
+    goToPage(btn.dataset.page);
+  });
+}
+
+function wireGenerateForm(){
+  document.getElementById('form-generate').addEventListener('submit', async function(e){
+    e.preventDefault();
+    var prefix = document.getElementById('gen-prefix').value.trim() || state.settings.defaultPrefix;
+    var qty = Math.min(100, Math.max(1, parseInt(document.getElementById('gen-qty').value,10) || 1));
+    var durVal = parseInt(document.getElementById('gen-duration-value').value,10) || 1;
+    var durUnit = document.getElementById('gen-duration-unit').value;
+    var note = document.getElementById('gen-note').value.trim();
+
+    var created = createKeys(qty, prefix, durVal, durUnit, note);
+    await persist();
+    renderGeneratedResult(created.concat(window.__lastGenerated || []).slice(0,30));
+    window.__lastGenerated = created.concat(window.__lastGenerated || []).slice(0,30);
+    renderDashboard();
+    toast('ok', ICON.check, qty + (qty===1 ? ' chave gerada.' : ' chaves geradas.'));
+  });
+}
+
+function wireManageFilters(){
+  document.getElementById('manage-search').addEventListener('input', renderManageTable);
+  document.getElementById('manage-filter-status').addEventListener('change', renderManageTable);
+  document.getElementById('btn-export-quick').addEventListener('click', exportData);
+}
+
+function wireRedeemForm(){
+  document.getElementById('btn-random-hwid').addEventListener('click', function(){
+    document.getElementById('redeem-hwid').value = genHwid();
+  });
+
+  document.getElementById('form-redeem').addEventListener('submit', async function(e){
+    e.preventDefault();
+    var keyVal = document.getElementById('redeem-key').value;
+    var hwidVal = document.getElementById('redeem-hwid').value;
+    var res = redeemKey(keyVal, hwidVal);
+    await persist();
+    renderManageTable();
+    renderDashboard();
+
+    var box = document.getElementById('redeem-result');
+    box.className = 'result-box ' + (res.ok ? 'success' : 'error');
+    var detailHtml = '';
+    if(res.key){
+      var st = computeStatus(res.key, Date.now());
+      detailHtml = '<div style="margin-top:14px; text-align:left; width:100%;">' +
+        '<div class="keycard-meta" style="justify-content:center;">' +
+          '<span>Status: <b>' + statusLabel(st) + '</b></span>' +
+          '<span>HWID: <b class="mono">' + escapeHtml(res.key.hwid||'—') + '</b></span>' +
+          '<span>Expira: <b>' + (res.key.durationUnit==='lifetime' ? 'Nunca' : fmtDate(res.key.expiresAt)) + '</b></span>' +
+        '</div></div>';
+    }
+    box.innerHTML = '<div>' +
+      '<div style="font-family:var(--font-display); font-size:14px; letter-spacing:.04em; color:' + (res.ok?'var(--pink-soft)':'var(--crimson-soft)') + ';">' +
+      (res.ok ? 'ACESSO LIBERADO' : 'ACESSO NEGADO') + '</div>' +
+      '<p style="margin-top:8px; font-size:13.5px;">' + escapeHtml(res.msg) + '</p>' +
+      detailHtml +
+    '</div>';
+  });
+}
+
+function wireActivityFilter(){
+  document.getElementById('activity-filter').addEventListener('change', renderActivityPage);
+}
+
+function exportData(){
+  try{
+    var payload = JSON.stringify(state, null, 2);
+    var blob = new Blob([payload], {type:'application/json'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = 'keywarden-backup-' + Date.now() + '.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    logActivity('data', 'Backup exportado (' + state.keys.length + ' chaves).');
+    persist();
+    toast('ok', ICON.check, 'Backup exportado.');
+  }catch(e){
+    toast('error', ICON.alert, 'Falha ao exportar backup.');
+  }
+}
+
+function wireSettingsPage(){
+  document.getElementById('btn-save-settings').addEventListener('click', async function(){
+    state.settings.defaultPrefix = (document.getElementById('set-prefix').value.trim() || 'KW').toUpperCase().slice(0,8);
+    state.settings.defaultDurationValue = parseInt(document.getElementById('set-duration-value').value,10) || 30;
+    state.settings.defaultDurationUnit = document.getElementById('set-duration-unit').value;
+    await persist();
+    toast('ok', ICON.check, 'Preferências salvas.');
+  });
+
+  document.getElementById('btn-export-full').addEventListener('click', exportData);
+
+  document.getElementById('btn-import-trigger').addEventListener('click', function(){
+    document.getElementById('import-file').click();
+  });
+
+  document.getElementById('import-file').addEventListener('change', function(e){
+    var file = e.target.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = async function(ev){
+      try{
+        var parsed = JSON.parse(ev.target.result);
+        if(!parsed || !Array.isArray(parsed.keys)){ throw new Error('formato inválido'); }
+        state = parsed;
+        ensureDefaults();
+        logActivity('data', 'Backup importado (' + state.keys.length + ' chaves).');
+        await persist();
+        renderDashboard(); renderManageTable(); renderSettingsPage();
+        toast('ok', ICON.check, 'Backup importado com sucesso.');
+      }catch(err){
+        toast('error', ICON.alert, 'Arquivo de backup inválido.');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  document.getElementById('btn-clear-all').addEventListener('click', function(){
+    showModal({
+      title:'Apagar todos os dados',
+      body:'Todas as ' + state.keys.length + ' chaves, vínculos de HWID e o histórico de atividade serão removidos permanentemente deste painel. Esta ação não pode ser desfeita.',
+      confirmText:'Apagar tudo',
+      danger:true,
+      onConfirm: async function(){
+        state = defaultState();
+        await persist();
+        renderDashboard(); renderManageTable(); renderActivityPage(); renderSettingsPage();
+        document.getElementById('generated-result').innerHTML = '<div class="empty-state"><p>AS CHAVES GERADAS APARECEM AQUI</p></div>';
+        toast('warn', ICON.alert, 'Todos os dados foram apagados.');
+      }
+    });
+  });
+}
+
+/* =========================================================
+   13. CLOCK
+========================================================= */
+function startClock(){
+  var el = document.getElementById('clock-text');
+  function tick(){ el.textContent = new Date().toLocaleTimeString('pt-BR'); }
+  tick();
+  setInterval(tick, 1000);
+}
+
+/* =========================================================
+   14. AMBIENT BACKGROUND — drifting embers
+========================================================= */
+function startBackground(){
+  var canvas = document.getElementById('bg-canvas');
+  var ctx = canvas.getContext('2d');
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var particles = [];
+  var W, H;
+
+  function resize(){
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  var COUNT = reduceMotion ? 0 : Math.min(70, Math.floor((window.innerWidth * window.innerHeight) / 22000));
+  for(var i=0;i<COUNT;i++){
+    particles.push({
+      x: Math.random()*W,
+      y: Math.random()*H,
+      r: 0.6 + Math.random()*1.8,
+      vy: -(0.12 + Math.random()*0.35),
+      vx: (Math.random()-0.5)*0.12,
+      a: 0.15 + Math.random()*0.5,
+      hue: Math.random() > 0.25 ? 'pink' : 'white'
+    });
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    for(var i=0;i<particles.length;i++){
+      var p = particles[i];
+      p.x += p.vx; p.y += p.vy;
+      if(p.y < -10){ p.y = H + 10; p.x = Math.random()*W; }
+      if(p.x < -10) p.x = W+10;
+      if(p.x > W+10) p.x = -10;
+      ctx.beginPath();
+      var color = p.hue === 'pink' ? '255,43,214' : '255,255,255';
+      var grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r*6);
+      grad.addColorStop(0, 'rgba(' + color + ',' + p.a + ')');
+      grad.addColorStop(1, 'rgba(' + color + ',0)');
+      ctx.fillStyle = grad;
+      ctx.arc(p.x, p.y, p.r*6, 0, Math.PI*2);
+      ctx.fill();
+    }
+    if(!reduceMotion) requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+/* =========================================================
+   15. INIT
+========================================================= */
+async function init(){
+  await loadState();
+
+  document.getElementById('loading-overlay').style.opacity = '0';
+  setTimeout(function(){ document.getElementById('loading-overlay').style.display = 'none'; }, 260);
+  document.getElementById('app').style.display = '';
+
+  document.getElementById('gen-prefix').value = state.settings.defaultPrefix;
+  document.getElementById('gen-duration-value').value = state.settings.defaultDurationValue;
+  document.getElementById('gen-duration-unit').value = state.settings.defaultDurationUnit;
+
+  wireNav();
+  wireGenerateForm();
+  wireManageFilters();
+  bindManageActions();
+  wireRedeemForm();
+  wireActivityFilter();
+  wireSettingsPage();
+  startClock();
+  startBackground();
+
+  renderDashboard();
+  renderManageTable();
+}
+
+window.__lastGenerated = [];
+document.addEventListener('DOMContentLoaded', init);
+})();
+</script>
+</body>
+</html>
